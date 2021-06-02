@@ -1,11 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-
 block_cipher = None
 
 
 a = Analysis(['app.py'],
-             pathex=['C:\\Users\\jkjh8\\Desktop\\dev\\Lotte_New\\lmd'],
+             pathex=['C:\\Users\\jkjh8\\Desktop\\Dev\\lmd'],
              binaries=[],
              datas=[],
              hiddenimports=[],

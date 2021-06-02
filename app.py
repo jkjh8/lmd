@@ -7,7 +7,7 @@ import time
 import sounddevice as sd
 import soundfile as sf
 from PySide2.QtWidgets import QApplication, QMainWindow, QPushButton, QFileDialog, QComboBox
-from PySide2.QtCore import Qt, Slot, Signal, QThread
+from PySide2.QtCore import Slot, Signal, QThread
 
 
 class Main(QMainWindow):
@@ -15,6 +15,7 @@ class Main(QMainWindow):
     play = Signal(str, int)
     stop = Signal()
     get = Signal()
+    channelIdx = Signal(int)
 
     def __init__(self):
         super().__init__()
@@ -30,12 +31,20 @@ class Main(QMainWindow):
         self.btnGet = QPushButton('Get', self)
         self.btnGet.move(260, 10)
 
+        self.qb1 = QComboBox(self)
+        self.qb1.resize(100, 28)
+        self.qb1.move(10, 50)
+
+        self.channel = [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9], [10, 11], [12, 13], [14, 15]]
+        self.qb1.addItems(['1,2', '3,4', '5,6', '7,8', '9,10', '11,12', '13,14', '15,16'])
+
+
         self.btnOpen = QPushButton('Open', self)
-        self.btnOpen.move(10, 50)
+        self.btnOpen.move(10, 90)
         self.btnPlay = QPushButton('Play', self)
-        self.btnPlay.move(110, 50)
+        self.btnPlay.move(110, 90)
         self.btnStop = QPushButton('Stop', self)
-        self.btnStop.move(210, 50)
+        self.btnStop.move(210, 90)
 
         self.Player = Player()
         self.play.connect(self.Player.play)
@@ -47,13 +56,24 @@ class Main(QMainWindow):
 
         self.Player.audio_devices.connect(self.updateDevices)
         self.qb.currentIndexChanged.connect(self.changeDevice)
+        self.qb1.currentIndexChanged.connect(self.changeChannel)
+
+        self.channelIdx.connect(self.Player.changeChannel)
+
         self.Player.start()
         self.deviceNum = 0
+        self.asioChannel = [0, 1]
         self.show()
 
     def showDialog(self):
         self.file = QFileDialog.getOpenFileName(self, 'Open file', './')
         print(self.file[0])
+
+    def changeChannel(self):
+        idx = self.qb1.currentIndex()
+        self.asioChannel = self.channel[idx]
+        self.channelIdx.emit(idx)
+
 
     def changeDevice(self):
         self.deviceNum = self.qb.currentIndex()
@@ -78,6 +98,7 @@ class Player(QThread):
 
     def __init__(self, parent=None):
         super(Player, self).__init__(parent)
+        self.asio_out = sd.AsioSettings([0, 1])
 
     @Slot()
     def get_devices(self):
@@ -86,14 +107,26 @@ class Player(QThread):
         if self.deviceList:
             for device in self.deviceList:
                 self.devices.append(device['name'])
+        print(sd.query_hostapis(2))
         self.audio_devices.emit(self.devices)
+
+    @Slot(int)
+    def changeChannel(self, idx):
+        self.channel = [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9], [10, 11], [12, 13], [14, 15]]
+        self.asio_out = sd.AsioSettings(channel_selectors = self.channel[idx])
+        print(self.asio_out)
+        sd.extra_settings = self.asio_out
 
     @Slot(str, int)
     def play(self, file, device):
         print(file)
-        asio_out = sd.AsioSettings(channel_selectors=[0, 1])
+        # asio_out = sd.AsioSettings(channel_selectors=[0, 1])
         self.data, self.fs = sf.read(file, dtype='float32')
-        sd.play(self.data, self.fs, device=device, extra_settings=asio_out)
+        sd.play(self.data, self.fs, device=device, extra_settings=self.asio_out)
+
+    def callback(indata, oudata, frames, tiem, status):
+        if status:
+            print(time, status)
 
     @Slot()
     def stop(self):
